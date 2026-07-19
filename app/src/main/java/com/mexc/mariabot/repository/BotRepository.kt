@@ -155,4 +155,12 @@ class BotRepository(
             "تم تحويل $amount USDT بنجاح من محفظة Spot إلى Futures لدعم الهامش."
         )
     }
+
+    fun getCachedCandles(symbol: String, interval: String): List<Candle> {
+        return dbHelper.getCachedCandles(symbol, interval)
+    }
+
+    fun saveCachedCandles(symbol: String, interval: String, candles: List<Candle>) {
+        dbHelper.saveCachedCandles(symbol, interval, candles)
+    }
 }

@@ -266,4 +266,90 @@ class AppDatabaseHelper(val context: Context) : SQLiteOpenHelper(context, DATABA
         val db = writableDatabase
         db.delete(TABLE_BOT_LOGS, null, null)
     }
+
+    // --- Cached Candles Operations ---
+    fun saveCachedCandles(symbol: String, interval: String, candles: List<com.mexc.mariabot.model.Candle>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS cached_candles (
+                    id TEXT PRIMARY KEY,
+                    symbol TEXT,
+                    interval TEXT,
+                    timestamp INTEGER,
+                    open REAL,
+                    high REAL,
+                    low REAL,
+                    close REAL,
+                    volume REAL
+                )
+            """)
+            
+            candles.forEach { candle ->
+                val values = ContentValues().apply {
+                    put("id", "${symbol}_${interval}_${candle.time}")
+                    put("symbol", symbol)
+                    put("interval", interval)
+                    put("timestamp", candle.time)
+                    put("open", candle.open)
+                    put("high", candle.high)
+                    put("low", candle.low)
+                    put("close", candle.close)
+                    put("volume", candle.volume)
+                }
+                db.insertWithOnConflict("cached_candles", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+            }
+            db.setTransactionSuccessful()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    fun getCachedCandles(symbol: String, interval: String): List<com.mexc.mariabot.model.Candle> {
+        val list = mutableListOf<com.mexc.mariabot.model.Candle>()
+        val db = readableDatabase
+        try {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS cached_candles (
+                    id TEXT PRIMARY KEY,
+                    symbol TEXT,
+                    interval TEXT,
+                    timestamp INTEGER,
+                    open REAL,
+                    high REAL,
+                    low REAL,
+                    close REAL,
+                    volume REAL
+                )
+            """)
+            
+            val cursor = db.query(
+                "cached_candles",
+                null,
+                "symbol = ? AND interval = ?",
+                arrayOf(symbol, interval),
+                null, null,
+                "timestamp ASC"
+            )
+            while (cursor.moveToNext()) {
+                list.add(
+                    com.mexc.mariabot.model.Candle(
+                        time = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
+                        open = cursor.getDouble(cursor.getColumnIndexOrThrow("open")),
+                        high = cursor.getDouble(cursor.getColumnIndexOrThrow("high")),
+                        low = cursor.getDouble(cursor.getColumnIndexOrThrow("low")),
+                        close = cursor.getDouble(cursor.getColumnIndexOrThrow("close")),
+                        volume = cursor.getDouble(cursor.getColumnIndexOrThrow("volume"))
+                    )
+                )
+            }
+            cursor.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
 }

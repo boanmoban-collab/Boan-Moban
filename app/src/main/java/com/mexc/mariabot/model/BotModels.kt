@@ -42,6 +42,15 @@ data class BotLog(
     val message: String
 )
 
+data class Candle(
+    val time: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double
+)
+
 enum class DashboardTab {
-    TRADING, REWARDS, BUILD, SETTINGS
+    DASHBOARD, MARKETS, FUTURES, WALLET, ORDERS, SETTINGS
 }

@@ -5,12 +5,20 @@ import retrofit2.Call
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.Query
 import retrofit2.http.QueryMap
 
 interface MexcApiService {
 
     @GET("api/v3/time")
     fun getServerTime(): Call<ServerTimeResponse>
+
+    @GET("api/v3/klines")
+    fun getKlines(
+        @Query("symbol") symbol: String,
+        @Query("interval") interval: String,
+        @Query("limit") limit: Int = 100
+    ): Call<List<List<Any>>>
 
     @GET("api/v3/account")
     fun getSpotAccount(

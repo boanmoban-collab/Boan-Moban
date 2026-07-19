@@ -48,8 +48,20 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
     private val _isAutoTradingActive = MutableStateFlow(false)
     val isAutoTradingActive: StateFlow<Boolean> = _isAutoTradingActive.asStateFlow()
 
-    private val _activeTab = MutableStateFlow(DashboardTab.TRADING)
+    private val _activeTab = MutableStateFlow(DashboardTab.DASHBOARD)
     val activeTab: StateFlow<DashboardTab> = _activeTab.asStateFlow()
+
+    private val _candlesState = MutableStateFlow<List<Candle>>(emptyList())
+    val candlesState: StateFlow<List<Candle>> = _candlesState.asStateFlow()
+
+    private val _selectedIntervalState = MutableStateFlow("1m")
+    val selectedIntervalState: StateFlow<String> = _selectedIntervalState.asStateFlow()
+
+    private val _spotWalletState = MutableStateFlow<List<com.mexc.mariabot.network.SpotAssetBalance>>(emptyList())
+    val spotWalletState: StateFlow<List<com.mexc.mariabot.network.SpotAssetBalance>> = _spotWalletState.asStateFlow()
+
+    private val _futuresWalletState = MutableStateFlow<com.mexc.mariabot.network.FuturesAssetData?>(null)
+    val futuresWalletState: StateFlow<com.mexc.mariabot.network.FuturesAssetData?> = _futuresWalletState.asStateFlow()
 
     private var priceJob: Job? = null
     private var tradingJob: Job? = null
@@ -63,6 +75,8 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         startWebSocketConnection()
         startPriceSimulation()
         startAutomaticRewardsLoop()
+        loadKlines("1m")
+        fetchWalletData()
     }
 
     fun syncTime() {
@@ -173,6 +187,12 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         }
         _priceHistoryState.value = history
 
+        // Update real-time candle tick
+        updateLiveCandle(newPrice)
+
+        // Refresh wallet simulation / data
+        fetchWalletData()
+
         // Analyze and update insights
         val insight = marketIntelligence.analyzeMarket(history, "BTCUSDT")
         _marketInsightState.value = insight
@@ -203,6 +223,179 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         if (mutated) {
             _positionsState.value = repository.getPositions()
         }
+    }
+
+    private fun updateLiveCandle(newPrice: Double) {
+        val currentCandles = _candlesState.value.toMutableList()
+        val interval = _selectedIntervalState.value
+        val intervalMs = when (interval) {
+            "1m" -> 60_000L
+            "5m" -> 5 * 60_000L
+            "15m" -> 15 * 60_000L
+            "1h" -> 60 * 60_000L
+            "4h" -> 4 * 60_000L
+            else -> 24 * 60 * 60_000L // "1d"
+        }
+        val now = System.currentTimeMillis()
+        if (currentCandles.isEmpty()) {
+            val newCandle = Candle(
+                time = now - (now % intervalMs),
+                open = newPrice,
+                high = newPrice,
+                low = newPrice,
+                close = newPrice,
+                volume = Random.nextDouble(5.0, 50.0)
+            )
+            currentCandles.add(newCandle)
+            _candlesState.value = currentCandles
+        } else {
+            val last = currentCandles.last()
+            val candleStart = now - (now % intervalMs)
+            if (candleStart > last.time) {
+                // Save last candle in cache
+                viewModelScope.launch(Dispatchers.IO) {
+                    repository.saveCachedCandles("BTCUSDT", interval, listOf(last))
+                }
+                // Add new candle
+                val newCandle = Candle(
+                    time = candleStart,
+                    open = last.close,
+                    high = maxOf(last.close, newPrice),
+                    low = minOf(last.close, newPrice),
+                    close = newPrice,
+                    volume = Random.nextDouble(1.0, 10.0)
+                )
+                currentCandles.add(newCandle)
+                if (currentCandles.size > 500) {
+                    currentCandles.removeAt(0)
+                }
+                _candlesState.value = currentCandles
+            } else {
+                // Update existing candle
+                val updated = last.copy(
+                    high = maxOf(last.high, newPrice),
+                    low = minOf(last.low, newPrice),
+                    close = newPrice,
+                    volume = last.volume + Random.nextDouble(0.1, 1.5)
+                )
+                currentCandles[currentCandles.size - 1] = updated
+                _candlesState.value = currentCandles
+            }
+        }
+    }
+
+    fun loadKlines(interval: String) {
+        _selectedIntervalState.value = interval
+        viewModelScope.launch {
+            // Load local database cache first for instant offline viewing
+            val cached = withContext(Dispatchers.IO) {
+                repository.getCachedCandles("BTCUSDT", interval)
+            }
+            if (cached.isNotEmpty()) {
+                _candlesState.value = cached
+            }
+
+            // Fetch from MEXC public API
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    repository.apiService.getKlines("BTCUSDT", interval, 100).execute()
+                }
+                if (response.isSuccessful && response.body() != null) {
+                    val rawList = response.body()!!
+                    val parsed = rawList.mapNotNull { item ->
+                        try {
+                            if (item.size >= 6) {
+                                Candle(
+                                    time = (item[0] as? Number)?.toLong() ?: 0L,
+                                    open = (item[1] as? String)?.toDoubleOrNull() ?: 0.0,
+                                    high = (item[2] as? String)?.toDoubleOrNull() ?: 0.0,
+                                    low = (item[3] as? String)?.toDoubleOrNull() ?: 0.0,
+                                    close = (item[4] as? String)?.toDoubleOrNull() ?: 0.0,
+                                    volume = (item[5] as? String)?.toDoubleOrNull() ?: 0.0
+                                )
+                            } else null
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    if (parsed.isNotEmpty()) {
+                        _candlesState.value = parsed
+                        withContext(Dispatchers.IO) {
+                            repository.saveCachedCandles("BTCUSDT", interval, parsed)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                repository.addBotLog("WARNING", "⚠️ فشل مزامنة الشموع من خادم MEXC: ${e.localizedMessage}. تم استخدام البيانات المخزنة.")
+                _botLogsState.value = repository.getBotLogs()
+            }
+        }
+    }
+
+    fun fetchWalletData() {
+        val config = repository.getConfig()
+        viewModelScope.launch {
+            if (config.apiKey.isBlank() || config.apiSecret.isBlank()) {
+                generateSimulatedWalletData()
+                return@launch
+            }
+
+            try {
+                // Fetch real Spot assets from MEXC
+                val spotParams = mutableMapOf<String, String>()
+                spotParams["timestamp"] = (System.currentTimeMillis() + _timeOffsetState.value).toString()
+                val spotSig = com.mexc.mariabot.util.MexcSignatureHelper.generateSignature(spotParams, config.apiSecret)
+                spotParams["signature"] = spotSig
+
+                val spotResp = withContext(Dispatchers.IO) {
+                    repository.apiService.getSpotAccount(config.apiKey, spotParams).execute()
+                }
+                if (spotResp.isSuccessful && spotResp.body() != null) {
+                    _spotWalletState.value = spotResp.body()!!.balances
+                }
+
+                // Fetch real Futures asset margin and balances from MEXC
+                val futuresParams = mutableMapOf<String, String>()
+                futuresParams["timestamp"] = (System.currentTimeMillis() + _timeOffsetState.value).toString()
+                val futuresSig = com.mexc.mariabot.util.MexcSignatureHelper.generateSignature(futuresParams, config.apiSecret)
+                futuresParams["signature"] = futuresSig
+
+                val futuresResp = withContext(Dispatchers.IO) {
+                    repository.apiService.getFuturesAssets(config.apiKey, futuresParams).execute()
+                }
+                if (futuresResp.isSuccessful && futuresResp.body() != null) {
+                    val data = futuresResp.body()!!.data
+                    if (!data.isNullOrEmpty()) {
+                        _futuresWalletState.value = data[0]
+                    }
+                }
+            } catch (e: Exception) {
+                generateSimulatedWalletData()
+            }
+        }
+    }
+
+    fun generateSimulatedWalletData() {
+        val activePositions = repository.getPositions().filter { it.status == "ACTIVE" }
+        val currentPnl = activePositions.sumOf { it.pnl }
+
+        val spotList = listOf(
+            com.mexc.mariabot.network.SpotAssetBalance("USDT", "14500.50", "0.00"),
+            com.mexc.mariabot.network.SpotAssetBalance("BTC", "0.185", "0.00"),
+            com.mexc.mariabot.network.SpotAssetBalance("MX", "520.00", "0.00"),
+            com.mexc.mariabot.network.SpotAssetBalance("ETH", "1.25", "0.00")
+        )
+        _spotWalletState.value = spotList
+
+        val marginUsed = activePositions.sumOf { (it.amount * it.entryPrice) / it.leverage }
+        val walletBalance = 5000.0 + currentPnl
+        val availBalance = maxOf(0.0, walletBalance - marginUsed)
+        _futuresWalletState.value = com.mexc.mariabot.network.FuturesAssetData(
+            currency = "USDT",
+            availableBalance = availBalance,
+            bonus = 150.00,
+            positionMargin = marginUsed
+        )
     }
 
     private fun startPriceSimulation() {

@@ -9,6 +9,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.mexc.mariabot.model.*
 import com.mexc.mariabot.ui.MariaBotViewModel
 import com.mexc.mariabot.ui.theme.*
+import com.mexc.mariabot.ui.components.InteractiveCandlestickChart
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +69,7 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                         Text(
                             text = "MARIA BOT • MEXC AUTOMATION",
                             color = Color.White,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace
                         )
@@ -88,7 +94,7 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                         Text(
                             text = "$${String.format("%.2f", btcPrice)} USDT",
                             color = Color.White,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
@@ -102,10 +108,10 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                 tonalElevation = 8.dp
             ) {
                 NavigationBarItem(
-                    selected = activeTab == DashboardTab.TRADING,
-                    onClick = { viewModel.changeTab(DashboardTab.TRADING) },
-                    icon = { Icon(Icons.Default.TrendingUp, contentDescription = "تداول") },
-                    label = { Text("تداول", fontWeight = FontWeight.Bold) },
+                    selected = activeTab == DashboardTab.DASHBOARD,
+                    onClick = { viewModel.changeTab(DashboardTab.DASHBOARD) },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "الرئيسية") },
+                    label = { Text("الرئيسية", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
                         selectedTextColor = EmeraldNeon,
@@ -115,10 +121,10 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                     )
                 )
                 NavigationBarItem(
-                    selected = activeTab == DashboardTab.REWARDS,
-                    onClick = { viewModel.changeTab(DashboardTab.REWARDS) },
-                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "مكافآت") },
-                    label = { Text("المكافآت", fontWeight = FontWeight.Bold) },
+                    selected = activeTab == DashboardTab.MARKETS,
+                    onClick = { viewModel.changeTab(DashboardTab.MARKETS) },
+                    icon = { Icon(Icons.Default.ShowChart, contentDescription = "الأسواق") },
+                    label = { Text("الأسواق", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
                         selectedTextColor = EmeraldNeon,
@@ -128,10 +134,36 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                     )
                 )
                 NavigationBarItem(
-                    selected = activeTab == DashboardTab.BUILD,
-                    onClick = { viewModel.changeTab(DashboardTab.BUILD) },
-                    icon = { Icon(Icons.Default.Build, contentDescription = "بناء") },
-                    label = { Text("بناء CI/CD", fontWeight = FontWeight.Bold) },
+                    selected = activeTab == DashboardTab.FUTURES,
+                    onClick = { viewModel.changeTab(DashboardTab.FUTURES) },
+                    icon = { Icon(Icons.Default.Bolt, contentDescription = "العقود") },
+                    label = { Text("العقود", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = EmeraldNeon,
+                        indicatorColor = EmeraldNeon,
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+                NavigationBarItem(
+                    selected = activeTab == DashboardTab.WALLET,
+                    onClick = { viewModel.changeTab(DashboardTab.WALLET) },
+                    icon = { Icon(Icons.Default.AccountBalanceWallet, contentDescription = "المحفظة") },
+                    label = { Text("المحفظة", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.Black,
+                        selectedTextColor = EmeraldNeon,
+                        indicatorColor = EmeraldNeon,
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+                NavigationBarItem(
+                    selected = activeTab == DashboardTab.ORDERS,
+                    onClick = { viewModel.changeTab(DashboardTab.ORDERS) },
+                    icon = { Icon(Icons.Default.ListAlt, contentDescription = "العمليات") },
+                    label = { Text("العمليات", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
                         selectedTextColor = EmeraldNeon,
@@ -143,8 +175,8 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                 NavigationBarItem(
                     selected = activeTab == DashboardTab.SETTINGS,
                     onClick = { viewModel.changeTab(DashboardTab.SETTINGS) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "إعدادات") },
-                    label = { Text("الإعدادات", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "الإعدادات") },
+                    label = { Text("الإعدادات", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.Black,
                         selectedTextColor = EmeraldNeon,
@@ -165,163 +197,35 @@ fun DashboardScreen(viewModel: MariaBotViewModel) {
                 .padding(horizontal = 16.dp)
         ) {
             when (activeTab) {
-                DashboardTab.TRADING -> TradingTabContent(viewModel)
-                DashboardTab.REWARDS -> RewardsTabContent(viewModel)
-                DashboardTab.BUILD -> BuildTabContent()
+                DashboardTab.DASHBOARD -> DashboardTabContent(viewModel)
+                DashboardTab.MARKETS -> MarketsTabContent(viewModel)
+                DashboardTab.FUTURES -> FuturesTabContent(viewModel)
+                DashboardTab.WALLET -> WalletTabContent(viewModel)
+                DashboardTab.ORDERS -> OrdersTabContent(viewModel)
                 DashboardTab.SETTINGS -> SettingsTabContent(viewModel)
             }
         }
     }
 }
 
-// ==================== TRADING TAB ====================
+// ==================== 1. DASHBOARD TAB ====================
 @Composable
-fun TradingTabContent(viewModel: MariaBotViewModel) {
-    val isAutoTradingActive by viewModel.isAutoTradingActive.collectAsState()
-    val positions by viewModel.positionsState.collectAsState()
-    val btcPrice by viewModel.btcPriceState.collectAsState()
-    val priceHistory by viewModel.priceHistoryState.collectAsState()
+fun DashboardTabContent(viewModel: MariaBotViewModel) {
+    val isAutoActive by viewModel.isAutoTradingActive.collectAsState()
     val logs by viewModel.botLogsState.collectAsState()
-
-    var manualAmount by remember { mutableStateOf("0.02") }
-    var manualStopLoss by remember { mutableStateOf("") }
-    var manualTakeProfit by remember { mutableStateOf("") }
+    val insight by viewModel.marketInsightState.collectAsState()
+    val news by viewModel.newsState.collectAsState()
 
     LazyColumn(
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
+        contentPadding = PaddingValues(vertical = 16.dp)
     ) {
-        // Hero Section & Status Cards
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Toggle AI Trading Card
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { viewModel.toggleAutoTrading() },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isAutoTradingActive) EmeraldNeon.copy(alpha = 0.08f) else CardBg
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isAutoTradingActive) EmeraldNeon else BorderColor
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isAutoTradingActive) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = if (isAutoTradingActive) EmeraldNeon else Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (isAutoTradingActive) "تداول نشط" else "تداول متوقف",
-                            color = if (isAutoTradingActive) EmeraldNeon else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Device / Target info
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
-                    border = BorderStroke(1.dp, BorderColor)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Memory,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "جهاز: LT_9904",
-                            color = Color.LightGray,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Cloud Status / Socket Connection info
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
-                    border = BorderStroke(1.dp, EmeraldNeon.copy(alpha = 0.4f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudQueue,
-                            contentDescription = null,
-                            tint = EmeraldNeon,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "السحابة: متصل",
-                            color = EmeraldNeon,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-
-        // Live Price Chart Component
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "مخطط السعر الحقيقي لـ BTCUSDT",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PriceChart(priceHistory)
-                }
-            }
-        }
-
-        // Market Intelligence & AI Analysis
-        item {
-            val insight by viewModel.marketInsightState.collectAsState()
-            val news by viewModel.newsState.collectAsState()
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -329,251 +233,405 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "تحليلات الذكاء الاصطناعي الفورية (AI Market Intel)",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                        insight?.let {
-                            val badgeColor = when (it.sentiment) {
-                                "BULLISH" -> TextGreen
-                                "BEARISH" -> TextRed
-                                else -> Color.Gray
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (it.sentiment == "BULLISH") "صعودي (BULLISH)" else if (it.sentiment == "BEARISH") "هبوطي (BEARISH)" else "حيادي (NEUTRAL)",
-                                    color = badgeColor,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                        Column {
+                            Text("نظام التداول التلقائي الخوارزمي", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("التشغيل الذاتي المباشر على منصة MEXC", color = TextGray, fontSize = 12.sp)
                         }
-                    }
-
-                    insight?.let {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1.0f)) {
-                                Text("مؤشر RSI", color = Color.Gray, fontSize = 11.sp)
-                                val rsiCat = if (it.rsi > 70) "شراء مفرط" else if (it.rsi < 30) "بيع مفرط" else "متوازن"
-                                Text("${String.format("%.1f", it.rsi)} ($rsiCat)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Column(modifier = Modifier.weight(1.0f)) {
-                                Text("التذبذب", color = Color.Gray, fontSize = 11.sp)
-                                Text(it.volatility, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Column(modifier = Modifier.weight(1.0f)) {
-                                Text("الإشارة المقترحة", color = Color.Gray, fontSize = 11.sp)
-                                Text(
-                                    text = if (it.suggestedSignal == "BUY_LONG") "شراء LONG" else if (it.suggestedSignal == "SELL_SHORT") "بيع SHORT" else "انتظار WAIT",
-                                    color = if (it.suggestedSignal == "BUY_LONG") TextGreen else if (it.suggestedSignal == "SELL_SHORT") TextRed else Color.Gray,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "💡 تحليل الخوارزميات: مؤشر القوة RSI عند ${String.format("%.1f", it.rsi)} مع معدل تذبذب ${it.volatility} وزخم عقود مفتوحة ${it.openInterestTrend}.",
-                            color = Color.LightGray,
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp
+                        Switch(
+                            checked = isAutoActive,
+                            onCheckedChange = { viewModel.toggleAutoTrading() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = EmeraldNeon,
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = BorderColor
+                            )
                         )
                     }
-
-                    if (news.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = BorderColor, thickness = 1.dp)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("آخر معنويات السوق الأخبارية (BTC News)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        news.take(3).forEach { article ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(article.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text(article.source, color = Color.Gray, fontSize = 9.sp)
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            if (article.sentiment == "POSITIVE") TextGreen.copy(alpha = 0.15f)
-                                            else if (article.sentiment == "NEGATIVE") TextRed.copy(alpha = 0.15f)
-                                            else Color.Gray.copy(alpha = 0.15f),
-                                            RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = article.sentiment,
-                                        color = if (article.sentiment == "POSITIVE") TextGreen else if (article.sentiment == "NEGATIVE") TextRed else Color.Gray,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("بيئة التشغيل المادية", color = TextGray, fontSize = 11.sp)
+                            Text("جهاز LT_9904 المدمج", color = EmeraldNeon, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("مزامنة التوقيت", color = TextGray, fontSize = 11.sp)
+                            Text("متصل • زمن حقيقي", color = EmeraldNeon, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
             }
         }
 
-        // Manual Trading Terminal
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "محطة التداول اليدوية الآمنة",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                    Text("تحليل الذكاء الاصطناعي والمؤشرات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = manualAmount,
-                        onValueChange = { manualAmount = it },
-                        label = { Text("كمية العقد (BTC)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon,
-                            unfocusedBorderColor = BorderColor
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = manualStopLoss,
-                            onValueChange = { manualStopLoss = it },
-                            label = { Text("وقف الخسارة (SL)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = EmeraldNeon,
-                                focusedLabelColor = EmeraldNeon,
-                                unfocusedBorderColor = BorderColor
-                            )
-                        )
-                        OutlinedTextField(
-                            value = manualTakeProfit,
-                            onValueChange = { manualTakeProfit = it },
-                            label = { Text("جني الأرباح (TP)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = EmeraldNeon,
-                                focusedLabelColor = EmeraldNeon,
-                                unfocusedBorderColor = BorderColor
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                val amt = manualAmount.toDoubleOrNull() ?: 0.01
-                                val sl = manualStopLoss.toDoubleOrNull()
-                                val tp = manualTakeProfit.toDoubleOrNull()
-                                viewModel.executeManualOrder("LONG", amt, sl, tp)
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = TextGreen),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("فتح LONG (صعود)", color = Color.Black, fontWeight = FontWeight.Black)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("مؤشر القوة النسبية RSI", color = TextGray, fontSize = 11.sp)
+                            Text(
+                                text = String.format("%.2f", insight?.rsi ?: 50.0),
+                                color = if ((insight?.rsi ?: 50.0) > 70.0) TextRed else if ((insight?.rsi ?: 50.0) < 30.0) TextGreen else EmeraldNeon,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.sp
+                            )
                         }
-                        Button(
-                            onClick = {
-                                val amt = manualAmount.toDoubleOrNull() ?: 0.01
-                                val sl = manualStopLoss.toDoubleOrNull()
-                                val tp = manualTakeProfit.toDoubleOrNull()
-                                viewModel.executeManualOrder("SHORT", amt, sl, tp)
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = TextRed),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("فتح SHORT (هبوط)", color = Color.White, fontWeight = FontWeight.Black)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("التذبذب التاريخي", color = TextGray, fontSize = 11.sp)
+                            Text(
+                                text = insight?.volatility ?: "LOW",
+                                color = EmeraldNeon,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.sp
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("الاتجاه المقترح", color = TextGray, fontSize = 11.sp)
+                            val side = insight?.suggestedSignal ?: "HOLD_NEUTRAL"
+                            Text(
+                                text = if (side == "BUY_LONG") "شراء / LONG" else if (side == "SELL_SHORT") "بيع / SHORT" else "انتظار",
+                                color = if (side == "BUY_LONG") TextGreen else if (side == "SELL_SHORT") TextRed else TextGray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
                         }
                     }
                 }
             }
         }
 
-        // Active Positions Card List
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "مراكز العقود الآجلة النشطة (${positions.count { it.status == "ACTIVE" }})",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black
-                )
-                if (positions.any { it.status == "CLOSED" }) {
-                    Text(
-                        text = "مسح الصفقات المغلقة",
-                        color = EmeraldNeon,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { viewModel.clearClosedPositions() }
-                    )
+        if (news.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("الأخبار الاقتصادية المباشرة (BTC)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        news.take(3).forEach { article ->
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text(article.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(article.source, color = TextGray, fontSize = 10.sp)
+                                    Text(
+                                        if (article.sentiment == "BULLISH") "إيجابي" else if (article.sentiment == "BEARISH") "سلبي" else "محايد",
+                                        color = if (article.sentiment == "BULLISH") TextGreen else if (article.sentiment == "BEARISH") TextRed else TextGray,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Divider(color = BorderColor.copy(alpha = 0.5f), modifier = Modifier.padding(top = 6.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        val activePositions = positions.filter { it.status == "ACTIVE" }
-        if (activePositions.isEmpty()) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("عمليات التشغيل الفورية والذكاء الاصطناعي", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .border(1.dp, BorderColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                            .padding(8.dp)
+                    ) {
+                        LazyColumn(reverseLayout = false) {
+                            items(logs.take(15)) { log ->
+                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                    val color = when (log.type) {
+                                        "SUCCESS" -> TextGreen
+                                        "WARNING" -> AmberAccent
+                                        "ERROR" -> TextRed
+                                        else -> TextGray
+                                    }
+                                    Text("[${log.type}] ", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                    Text(log.message, color = Color.White, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 2. MARKETS TAB ====================
+@Composable
+fun MarketsTabContent(viewModel: MariaBotViewModel) {
+    val candles by viewModel.candlesState.collectAsState()
+    val currentPrice by viewModel.btcPriceState.collectAsState()
+    val selectedInterval by viewModel.selectedIntervalState.collectAsState()
+
+    val intervals = listOf("1m", "5m", "15m", "1h", "4h", "1d")
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("BTCUSDT الفوري", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                            Text("العقد والرسومات البيانية الحية لـ MEXC", color = TextGray, fontSize = 12.sp)
+                        }
+                        Text(
+                            text = "$${String.format("%.2f", currentPrice)}",
+                            color = EmeraldNeon,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 22.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("أعلى سعر 24ساعة", color = TextGray, fontSize = 11.sp)
+                            val high = if (candles.isNotEmpty()) candles.maxOf { it.high } else currentPrice * 1.01
+                            Text("$${String.format("%.1f", high)}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Column {
+                            Text("أدنى سعر 24ساعة", color = TextGray, fontSize = 11.sp)
+                            val low = if (candles.isNotEmpty()) candles.minOf { it.low } else currentPrice * 0.99
+                            Text("$${String.format("%.1f", low)}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("حجم التداول", color = TextGray, fontSize = 11.sp)
+                            val vol = if (candles.isNotEmpty()) candles.sumOf { it.volume } else 1850.5
+                            Text(String.format("%.2f BTC", vol), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                intervals.forEach { interval ->
+                    val selected = selectedInterval == interval
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                if (selected) EmeraldNeon else CardBg,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .border(1.dp, if (selected) EmeraldNeon else BorderColor, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.loadKlines(interval) }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = interval,
+                            color = if (selected) Color.Black else Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            InteractiveCandlestickChart(
+                candles = candles,
+                latestPrice = currentPrice
+            )
+        }
+    }
+}
+
+// ==================== 3. FUTURES MANUAL TAB ====================
+@Composable
+fun FuturesTabContent(viewModel: MariaBotViewModel) {
+    val positions by viewModel.positionsState.collectAsState()
+    val btcPrice by viewModel.btcPriceState.collectAsState()
+
+    var manualAmount by remember { mutableStateOf("0.02") }
+    var manualStopLoss by remember { mutableStateOf("") }
+    var manualTakeProfit by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("منصة تداول العقود المباشرة (BTCUSDT)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = manualAmount,
+                        onValueChange = { manualAmount = it },
+                        label = { Text("الكمية بالعقود (BTC)", color = TextGray) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = EmeraldNeon,
+                            unfocusedBorderColor = BorderColor,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = manualStopLoss,
+                            onValueChange = { manualStopLoss = it },
+                            label = { Text("وقف الخسارة (SL)", color = TextGray, fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = manualTakeProfit,
+                            onValueChange = { manualTakeProfit = it },
+                            label = { Text("أخذ الأرباح (TP)", color = TextGray, fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val amt = manualAmount.toDoubleOrNull() ?: 0.0
+                                val sl = manualStopLoss.toDoubleOrNull()
+                                val tp = manualTakeProfit.toDoubleOrNull()
+                                if (amt > 0) {
+                                    viewModel.executeManualOrder("LONG", amt, sl, tp)
+                                    Toast.makeText(context, "تم إرسال أمر LONG بنجاح", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = TextGreen),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("فتح LONG", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val amt = manualAmount.toDoubleOrNull() ?: 0.0
+                                val sl = manualStopLoss.toDoubleOrNull()
+                                val tp = manualTakeProfit.toDoubleOrNull()
+                                if (amt > 0) {
+                                    viewModel.executeManualOrder("SHORT", amt, sl, tp)
+                                    Toast.makeText(context, "تم إرسال أمر SHORT بنجاح", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = TextRed),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("فتح SHORT", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("المراكز المفتوحة النشطة (${positions.count { it.status == "ACTIVE" }})", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        val activeList = positions.filter { it.status == "ACTIVE" }
+        if (activeList.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                        .padding(32.dp),
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا توجد صفقات مفتوحة حالياً.", color = Color.Gray, fontSize = 13.sp)
+                    Text("لا توجد مراكز نشطة مفتوحة حالياً.", color = TextGray, fontSize = 12.sp)
                 }
             }
         } else {
-            items(activePositions) { pos ->
+            items(activeList) { pos ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = CardBg),
-                    border = BorderStroke(1.dp, if (pos.pnl >= 0) TextGreen.copy(alpha = 0.5f) else TextRed.copy(alpha = 0.5f))
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
@@ -581,62 +639,47 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                                         .background(if (pos.type == "LONG") TextGreen else TextRed, RoundedCornerShape(4.dp))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
-                                    Text(pos.type, color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                    Text(pos.type, color = if (pos.type == "LONG") Color.Black else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(pos.pair, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text(pos.pair, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("x${pos.leverage}", color = Color.LightGray, fontSize = 11.sp)
+                                Text("${pos.leverage}x", color = EmeraldNeon, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
-                            IconButton(
+                            Button(
                                 onClick = { viewModel.closeActivePosition(pos.id) },
-                                modifier = Modifier.size(24.dp)
-                              ) {
-                                Icon(Icons.Default.Close, contentDescription = "إغلاق الصفقة", tint = Color.Gray)
+                                colors = ButtonDefaults.buttonColors(containerColor = TextRed.copy(alpha = 0.2f), contentColor = TextRed),
+                                border = BorderStroke(1.dp, TextRed),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.height(26.dp)
+                            ) {
+                                Text("إغلاق المركز", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("سعر الدخول", color = Color.Gray, fontSize = 11.sp)
-                                Text("$${String.format("%.2f", pos.entryPrice)}", color = Color.White, fontSize = 13.sp)
+                                Text("سعر الدخول", color = TextGray, fontSize = 11.sp)
+                                Text("$${String.format("%.1f", pos.entryPrice)}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
                             Column {
-                                Text("السعر الحالي", color = Color.Gray, fontSize = 11.sp)
-                                Text("$${String.format("%.2f", pos.currentPrice)}", color = Color.White, fontSize = 13.sp)
+                                Text("السعر الحالي", color = TextGray, fontSize = 11.sp)
+                                Text("$${String.format("%.1f", pos.currentPrice)}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("PnL الأرباح/الخسائر", color = Color.Gray, fontSize = 11.sp)
+                                Text("أرباح/خسائر (USDT)", color = TextGray, fontSize = 11.sp)
+                                val color = if (pos.pnl >= 0) TextGreen else TextRed
+                                val sign = if (pos.pnl >= 0) "+" else ""
                                 Text(
-                                    text = "${if (pos.pnl >= 0) "+" else ""}${String.format("%.2f", pos.pnl)} USDT (${String.format("%.2f", pos.pnlPercent)}%)",
-                                    color = if (pos.pnl >= 0) TextGreen else TextRed,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black
-                                )
-                            }
-                        }
-                        if (pos.stopLoss != null || pos.takeProfit != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "وقف الخسارة (SL): ${pos.stopLoss?.let { "$${String.format("%.2f", it)}" } ?: "غير محدد"}",
-                                    color = AmberAccent,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "جني الأرباح (TP): ${pos.takeProfit?.let { "$${String.format("%.2f", it)}" } ?: "غير محدد"}",
-                                    color = EmeraldNeon,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = "$sign${String.format("%.2f", pos.pnl)} (${sign}${String.format("%.2f", pos.pnlPercent)}%)",
+                                    color = color,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace
                                 )
                             }
                         }
@@ -644,227 +687,293 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                 }
             }
         }
+    }
+}
 
-        // Live Console Log Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
+// ==================== 4. WALLET TAB ====================
+@Composable
+fun WalletTabContent(viewModel: MariaBotViewModel) {
+    var subTab by remember { mutableStateOf(0) }
+    val spotList by viewModel.spotWalletState.collectAsState()
+    val futuresData by viewModel.futuresWalletState.collectAsState()
+    val btcPrice by viewModel.btcPriceState.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf("محفظة فوري / Spot", "محفظة عقود / Futures").forEachIndexed { index, name ->
+                val selected = subTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (selected) EmeraldNeon else CardBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selected) EmeraldNeon else BorderColor, RoundedCornerShape(8.dp))
+                        .clickable { subTab = index }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = name,
+                        color = if (selected) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        if (subTab == 0) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                item {
+                    val totalEst = spotList.sumOf { asset ->
+                        val balance = asset.free.toDoubleOrNull() ?: 0.0
+                        if (asset.asset == "USDT") balance
+                        else if (asset.asset == "BTC") balance * btcPrice
+                        else if (asset.asset == "MX") balance * 5.0
+                        else if (asset.asset == "ETH") balance * 3500.0
+                        else 0.0
+                    }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "لوحة المراقبة والسجلات الحية",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                        IconButton(
-                            onClick = { viewModel.clearLogs() },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "مسح السجلات", tint = Color.Gray)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("إجمالي القيمة المقدرة للمحفظة الفورية", color = TextGray, fontSize = 12.sp)
+                            Text("$${String.format("%.2f", totalEst)} USDT", color = EmeraldNeon, fontWeight = FontWeight.Black, fontSize = 24.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(12.dp)
+                }
+
+                items(spotList) { asset ->
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, BorderColor.copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(logs) { log ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(asset.asset, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("متاح: ${asset.free} • مجمد: ${asset.locked}", color = TextGray, fontSize = 11.sp)
+                            }
+                            val valUsdt = (asset.free.toDoubleOrNull() ?: 0.0) * (if (asset.asset == "BTC") btcPrice else if (asset.asset == "MX") 5.0 else if (asset.asset == "ETH") 3500.0 else 1.0)
+                            Text("$${String.format("%.2f", valUsdt)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        } else {
+            val data = futuresData
+            val marginRatio = if (data != null && (data.availableBalance + data.positionMargin) > 0) {
+                (data.positionMargin / (data.availableBalance + data.positionMargin)) * 100.0
+            } else 0.0
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("رصيد محفظة العقود الآجلة الإجمالي", color = TextGray, fontSize = 12.sp)
+                            val totalBal = (data?.availableBalance ?: 0.0) + (data?.positionMargin ?: 0.0)
+                            Text("$${String.format("%.2f", totalBal)} USDT", color = EmeraldNeon, fontWeight = FontWeight.Black, fontSize = 24.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("هامش المركز الحالي", color = TextGray, fontSize = 12.sp)
+                                Text("$${String.format("%.2f", data?.positionMargin ?: 0.0)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("الهامش المتاح المتبقي", color = TextGray, fontSize = 12.sp)
+                                Text("$${String.format("%.2f", data?.availableBalance ?: 0.0)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("نسبة الهامش ومخاطر الحساب", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            LinearProgressIndicator(
+                                progress = (marginRatio / 100.0).toFloat().coerceIn(0f, 1f),
+                                color = if (marginRatio > 50.0) RedNeon else if (marginRatio > 25.0) AmberAccent else EmeraldNeon,
+                                trackColor = BorderColor,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("معدل الاستخدام: ${String.format("%.1f", marginRatio)}%", color = TextGray, fontSize = 11.sp)
+                                val riskStr = if (marginRatio > 50.0) "مرتفعة (High)" else if (marginRatio > 20.0) "متوسطة (Medium)" else "آمنة (Low Risk)"
+                                val riskColor = if (marginRatio > 50.0) TextRed else if (marginRatio > 20.0) AmberAccent else TextGreen
+                                Text("درجة المخاطرة: $riskStr", color = riskColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== 5. ORDERS TAB ====================
+@Composable
+fun OrdersTabContent(viewModel: MariaBotViewModel) {
+    val logs by viewModel.botLogsState.collectAsState()
+    val transfers by viewModel.transferLogsState.collectAsState()
+
+    var activeSubTab by remember { mutableStateOf(0) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf("سجل تحويل الأرباح والهامش", "سجل العمليات التقني").forEachIndexed { index, title ->
+                val selected = activeSubTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (selected) EmeraldNeon else CardBg, RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selected) EmeraldNeon else BorderColor, RoundedCornerShape(8.dp))
+                        .clickable { activeSubTab = index }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = title, color = if (selected) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+
+        if (activeSubTab == 0) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (transfers.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد تحويلات آلية للأرباح بعد.", color = TextGray, fontSize = 12.sp)
+                        }
+                    }
+                } else {
+                    items(transfers) { t ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CardBg),
+                            border = BorderStroke(1.dp, BorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    val logColor = when (log.type) {
-                                        "SUCCESS" -> TextGreen
-                                        "ERROR" -> TextRed
-                                        "WARNING" -> AmberAccent
-                                        else -> Color.Cyan
-                                    }
-                                    Text(
-                                        text = "[${log.type}]",
-                                        color = logColor,
-                                        fontSize = 10.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = log.message,
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    )
+                                    Text("دعم هامش تلقائي", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("+${t.amount} ${t.asset}", color = EmeraldNeon, fontWeight = FontWeight.Black, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("من ${t.fromAccount} إلى ${t.toAccount}", color = TextGray, fontSize = 11.sp)
+                                    Text("مكتمل", color = TextGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-// ==================== REWARDS TAB ====================
-@Composable
-fun RewardsTabContent(viewModel: MariaBotViewModel) {
-    val config by viewModel.configState.collectAsState()
-    val transferLogs by viewModel.transferLogsState.collectAsState()
-
-    var manualRewardAmount by remember { mutableStateOf("50.0") }
-
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
-    ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "نظام سحب المكافآت الترويجي الذكي",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "هذه التقنية تتولى رصد المكافآت المكتسبة في محفظة الفوري (Spot) وتحويلها دورياً وهامشياً كرافعة سيولة لتعزيز صفقات Futures المفتوحة بنجاح وآلياً.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-        }
-
-        // Automation Control
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("التحويل التلقائي للمكافآت", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text("نقل السيولة فورا لمحفظة العقود", color = Color.Gray, fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = config.autoTransferRewards,
-                        onCheckedChange = { viewModel.updateConfig(config.copy(autoTransferRewards = it)) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = EmeraldNeon,
-                            uncheckedThumbColor = Color.Gray,
-                            uncheckedTrackColor = Color.Black
-                        )
-                    )
-                }
-            }
-        }
-
-        // Manual Harvest Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("سحب ونقل سيولة فوري (Spot ➔ Futures)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = manualRewardAmount,
-                        onValueChange = { manualRewardAmount = it },
-                        label = { Text("المبلغ (USDT)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Text("أحدث 100 خطوة تشغيلية", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Button(
-                        onClick = {
-                            val amt = manualRewardAmount.toDoubleOrNull() ?: 10.0
-                            viewModel.manualRewardTransfer(amt)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldNeon),
-                        shape = RoundedCornerShape(8.dp)
+                        onClick = { viewModel.clearLogs() },
+                        colors = ButtonDefaults.buttonColors(containerColor = TextRed.copy(alpha = 0.15f), contentColor = TextRed),
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
                     ) {
-                        Text("بدء التحويل اليدوي الفوري", color = Color.Black, fontWeight = FontWeight.Black)
+                        Text("مسح السجل", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-            }
-        }
-
-        // Historic Logs list
-        item {
-            Text("تاريخ عمليات التحويل التلقائي واليدوي", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
-        }
-
-        if (transferLogs.isEmpty()) {
-            item {
-                Box(
+                Spacer(modifier = Modifier.height(10.dp))
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
+                        .padding(8.dp)
                 ) {
-                    Text("لا توجد عمليات تحويل مسجلة.", color = Color.Gray, fontSize = 12.sp)
-                }
-            }
-        } else {
-            items(transferLogs) { log ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
-                    border = BorderStroke(1.dp, BorderColor)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = TextGreen, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("${log.amount} ${log.asset}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                    items(logs) { log ->
+                        Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                            val color = when (log.type) {
+                                "SUCCESS" -> TextGreen
+                                "WARNING" -> AmberAccent
+                                "ERROR" -> TextRed
+                                else -> TextGray
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("من: Spot • إلى: Futures", color = Color.Gray, fontSize = 11.sp)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(TextGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(log.status, color = TextGreen, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Text("[${log.type}] ", color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            Text(log.message, color = Color.White, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
@@ -873,343 +982,244 @@ fun RewardsTabContent(viewModel: MariaBotViewModel) {
     }
 }
 
-// ==================== BUILD TAB ====================
-@Composable
-fun BuildTabContent() {
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-
-    var selectedBranch by remember { mutableStateOf("main") }
-
-    val buildYaml = """
-name: Maria Bot Build & Release
-
-on:
-  push:
-    branches: [ "$selectedBranch" ]
-  tags: [ "*" ]
-
-permissions:
-  contents: write
-
-jobs:
-  build:
-    name: Build & Sign Android App
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Source Code
-      uses: actions/checkout@v4
-
-    - name: Set up Java JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: 'gradle'
-
-    - name: Prepare Keystore and key.properties
-      run: |
-        mkdir -p app
-        echo "${'$'}{{ secrets.CM_KEYSTORE_BASE64 }}" | base64 --decode > app/release.keystore
-        echo "storeFile=release.keystore" > key.properties
-        echo "storePassword=${'$'}{{ secrets.CM_KEYSTORE_PASSWORD }}" >> key.properties
-        echo "keyAlias=${'$'}{{ secrets.CM_KEY_ALIAS }}" >> key.properties
-        echo "keyPassword=${'$'}{{ secrets.CM_KEYSTORE_PASSWORD }}" >> key.properties
-
-    - name: Build Signed Release APK & AAB
-      run: ./gradlew assembleRelease bundleRelease --no-daemon
-
-    - name: Upload APK Release Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: MariaBot-Release-APK
-        path: app/build/outputs/apk/release/*.apk
-
-    - name: Create Tag Release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        name: Maria Bot Release ${{'$'}}{{ github.ref_name }}
-        files: |
-          app/build/outputs/apk/release/*.apk
-          app/build/outputs/bundle/release/*.aab
-      env:
-        GITHUB_TOKEN: ${'$'}{{ secrets.GITHUB_TOKEN }}
-""".trimIndent()
-
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
-    ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "منشئ سير العمل التلقائي لـ GitHub Actions",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "يقوم هذا المولد بتهيئة ملف YAML الأفضل لبناء وتوقيع تطبيق أندرويد حقيقي للأجهزة LT_9904 تلقائياً فور رفع الكود إلى GitHub.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("تخصيص هدف البناء", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = selectedBranch,
-                        onValueChange = { selectedBranch = it },
-                        label = { Text("فرع البناء الرئيسي (Branch)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("ملف الإعداد (main.yml)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(buildYaml))
-                                Toast.makeText(context, "تم نسخ رمز YAML بنجاح!", Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "نسخ الرمز", tint = EmeraldNeon)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = buildYaml,
-                            color = Color.LightGray,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            lineHeight = 14.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ==================== SETTINGS TAB ====================
+// ==================== 6. SETTINGS TAB ====================
 @Composable
 fun SettingsTabContent(viewModel: MariaBotViewModel) {
     val config by viewModel.configState.collectAsState()
+    val context = LocalContext.current
 
-    var apiKeyInput by remember { mutableStateOf(config.apiKey) }
-    var apiSecretInput by remember { mutableStateOf(config.apiSecret) }
-    var isSandboxInput by remember { mutableStateOf(config.isSandbox) }
-    var leverageInput by remember { mutableStateOf(config.leverage.toString()) }
-    var durationInput by remember { mutableStateOf(config.eventDurationMinutes.toString()) }
+    var apiKey by remember(config) { mutableStateOf(config.apiKey) }
+    var apiSecret by remember(config) { mutableStateOf(config.apiSecret) }
+    var leverage by remember(config) { mutableStateOf(config.leverage.toString()) }
+    var durationMin by remember(config) { mutableStateOf(config.eventDurationMinutes.toString()) }
+    var sandbox by remember(config) { mutableStateOf(config.isSandbox) }
 
-    var passwordVisible by remember { mutableStateOf(false) }
+    var actionsSubTab by remember { mutableStateOf(0) }
 
     LazyColumn(
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp, top = 8.dp)
+        contentPadding = PaddingValues(vertical = 16.dp)
     ) {
         item {
-            Card(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("تكامل واجهات MEXC API الرسمية", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // API Key
-                    OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = { apiKeyInput = it },
-                        label = { Text("MEXC API Key") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // API Secret
-                    OutlinedTextField(
-                        value = apiSecretInput,
-                        onValueChange = { apiSecretInput = it },
-                        label = { Text("MEXC API Secret") },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(image, contentDescription = null, tint = Color.Gray)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
-                }
-            }
-        }
-
-        // Mode Toggles & Config parameters
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("معايير التداول والتحوط", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Sandbox Mode Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                listOf("إعدادات الاتصال الآمن", "بناء CI/CD ومزامنة الغيم").forEachIndexed { index, name ->
+                    val selected = actionsSubTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(if (selected) EmeraldNeon else CardBg, RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selected) EmeraldNeon else BorderColor, RoundedCornerShape(8.dp))
+                            .clickable { actionsSubTab = index }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column {
-                            Text("وضع الحساب التجريبي (Sandbox)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text("تداول آمن وهمي بدون مخاطرة بأموال حقيقية", color = Color.Gray, fontSize = 11.sp)
-                        }
-                        Switch(
-                            checked = isSandboxInput,
-                            onCheckedChange = { isSandboxInput = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
-                                checkedTrackColor = EmeraldNeon
-                            )
-                        )
+                        Text(text = name, color = if (selected) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Leverage
-                    OutlinedTextField(
-                        value = leverageInput,
-                        onValueChange = { leverageInput = it },
-                        label = { Text("الرافعة المالية للعقود الآجلة (Leverage)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Event check duration
-                    OutlinedTextField(
-                        value = durationInput,
-                        onValueChange = { durationInput = it },
-                        label = { Text("مدة رصد الأحداث الدورية (دقائق)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldNeon,
-                            focusedLabelColor = EmeraldNeon
-                        )
-                    )
                 }
             }
         }
 
-        // Action Buttons
-        item {
-            Button(
-                onClick = {
-                    val lev = leverageInput.toIntOrNull() ?: 20
-                    val dur = durationInput.toIntOrNull() ?: 10
-                    viewModel.updateConfig(
-                        config.copy(
-                            apiKey = apiKeyInput,
-                            apiSecret = apiSecretInput,
-                            isSandbox = isSandboxInput,
-                            leverage = lev,
-                            eventDurationMinutes = dur
+        if (actionsSubTab == 0) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("الربط والاتصال الآمن بواجهات MEXC", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("كافة المفاتيح مشفرة ومحفوظة بـ Keystore للنظام", color = TextGray, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = apiKey,
+                            onValueChange = { apiKey = it },
+                            label = { Text("MEXC API Key (X-MEXC-APIKEY)", color = TextGray) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         )
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldNeon),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("حفظ وتأكيد الإعدادات", color = Color.Black, fontWeight = FontWeight.Black)
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = apiSecret,
+                            onValueChange = { apiSecret = it },
+                            label = { Text("MEXC Secret Key", color = TextGray) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("وضع المحاكاة التجريبي (Sandbox)", color = Color.White, fontSize = 12.sp)
+                            Switch(
+                                checked = sandbox,
+                                onCheckedChange = { sandbox = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = EmeraldNeon
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("معاملات خوارزمية التداول السريع", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = leverage,
+                            onValueChange = { leverage = it },
+                            label = { Text("الرافعة المالية للعقود (Leverage)", color = TextGray) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = durationMin,
+                            onValueChange = { durationMin = it },
+                            label = { Text("دورة الفحص والتحليل بالدقائق (Minutes)", color = TextGray) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                val levVal = leverage.toIntOrNull() ?: 20
+                                val durVal = durationMin.toIntOrNull() ?: 10
+                                val updated = MEXCConfig(
+                                    apiKey = apiKey,
+                                    apiSecret = apiSecret,
+                                    leverage = levVal,
+                                    eventDurationMinutes = durVal,
+                                    isSandbox = sandbox
+                                )
+                                viewModel.updateConfig(updated)
+                                Toast.makeText(context, "تم حفظ الإعدادات بنجاح", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldNeon),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("حفظ وتأكيد الإعدادات والمفاتيح", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        } else {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("مولد ومراقب حزم البناء CI/CD", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("توليد ملفات GitHub Workflows وبناء حزم الإنتاج المباشر APK & AAB آلياً", color = TextGray, fontSize = 11.sp)
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text("هيكل ملف سير العمل (.github/workflows/build.yml):", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .border(1.dp, BorderColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                .padding(8.dp)
+                        ) {
+                            LazyColumn {
+                                item {
+                                    Text(
+                                        text = """
+name: Build Android Releases
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+      - name: Build APK & AAB
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease
+                                        """.trimIndent(),
+                                        color = EmeraldNeon,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        val clipboard = LocalClipboardManager.current
+                        Button(
+                            onClick = {
+                                clipboard.setText(AnnotatedString("name: Build Android Releases..."))
+                                Toast.makeText(context, "تم نسخ كود GitHub Actions بنجاح!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldNeon),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("نسخ إعدادات سير العمل CI/CD", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
-    }
-}
-
-// Simple and highly optimized vector price chart component
-@Composable
-fun PriceChart(prices: List<Double>) {
-    if (prices.size < 2) return
-
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .padding(top = 8.dp)
-    ) {
-        val maxPrice = prices.maxOrNull() ?: 1.0
-        val minPrice = prices.minOrNull() ?: 0.0
-        val priceRange = if (maxPrice - minPrice == 0.0) 1.0 else maxPrice - minPrice
-
-        val width = size.width
-        val height = size.height
-
-        val path = Path()
-        val stepX = width / (prices.size - 1)
-
-        prices.forEachIndexed { index, price ->
-            val normalizedY = ((price - minPrice) / priceRange)
-            val x = index * stepX
-            val y = height - (normalizedY * height).toFloat()
-
-            if (index == 0) {
-                path.moveTo(x, y)
-            } else {
-                path.lineTo(x, y)
-            }
-        }
-
-        drawPath(
-            path = path,
-            color = EmeraldNeon,
-            style = Stroke(width = 3.dp.toPx())
-        )
     }
 }
