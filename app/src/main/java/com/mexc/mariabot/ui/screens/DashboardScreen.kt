@@ -697,6 +697,10 @@ fun WalletTabContent(viewModel: MariaBotViewModel) {
     val spotList by viewModel.spotWalletState.collectAsState()
     val futuresData by viewModel.futuresWalletState.collectAsState()
     val btcPrice by viewModel.btcPriceState.collectAsState()
+    val positions by viewModel.positionsState.collectAsState()
+
+    val activePositions = positions.filter { it.status == "ACTIVE" }
+    val totalUnrealizedPnl = activePositions.sumOf { it.pnl }
 
     Column(
         modifier = Modifier
@@ -761,27 +765,77 @@ fun WalletTabContent(viewModel: MariaBotViewModel) {
                         border = BorderStroke(1.dp, BorderColor.copy(alpha = 0.6f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(14.dp)
                         ) {
-                            Column {
-                                Text(asset.asset, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text("متاح: ${asset.free} • مجمد: ${asset.locked}", color = TextGray, fontSize = 11.sp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = asset.asset,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                                val valUsdt = (asset.free.toDoubleOrNull() ?: 0.0) * (if (asset.asset == "BTC") btcPrice else if (asset.asset == "MX") 5.0 else if (asset.asset == "ETH") 3500.0 else 1.0)
+                                Text(
+                                    text = "$${String.format("%.2f", valUsdt)} USDT",
+                                    color = EmeraldNeon,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
                             }
-                            val valUsdt = (asset.free.toDoubleOrNull() ?: 0.0) * (if (asset.asset == "BTC") btcPrice else if (asset.asset == "MX") 5.0 else if (asset.asset == "ETH") 3500.0 else 1.0)
-                            Text("$${String.format("%.2f", valUsdt)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "الرصيد المتاح (Available Balance):",
+                                    color = TextGray,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = asset.free,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "الرصيد المجمد (Frozen Balance):",
+                                    color = TextGray,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = asset.locked,
+                                    color = TextRed.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
                         }
                     }
                 }
             }
         } else {
             val data = futuresData
-            val marginRatio = if (data != null && (data.availableBalance + data.positionMargin) > 0) {
-                (data.positionMargin / (data.availableBalance + data.positionMargin)) * 100.0
+            val rawWalletBalance = (data?.availableBalance ?: 0.0) + (data?.positionMargin ?: 0.0)
+            val walletBalanceWithPnl = rawWalletBalance + totalUnrealizedPnl
+            val marginRatio = if (walletBalanceWithPnl > 0) {
+                ((data?.positionMargin ?: 0.0) / walletBalanceWithPnl) * 100.0
             } else 0.0
 
             LazyColumn(
@@ -795,35 +849,49 @@ fun WalletTabContent(viewModel: MariaBotViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("رصيد محفظة العقود الآجلة الإجمالي", color = TextGray, fontSize = 12.sp)
-                            val totalBal = (data?.availableBalance ?: 0.0) + (data?.positionMargin ?: 0.0)
-                            Text("$${String.format("%.2f", totalBal)} USDT", color = EmeraldNeon, fontWeight = FontWeight.Black, fontSize = 24.sp, fontFamily = FontFamily.Monospace)
+                            Text("رصيد محفظة العقود الإجمالي (Wallet Balance)", color = TextGray, fontSize = 12.sp)
+                            Text("$${String.format("%.2f", walletBalanceWithPnl)} USDT", color = EmeraldNeon, fontWeight = FontWeight.Black, fontSize = 24.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
 
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = CardBg),
+                        colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.8f)),
                         border = BorderStroke(1.dp, BorderColor),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
+                            // Available Margin
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("هامش المركز الحالي", color = TextGray, fontSize = 12.sp)
-                                Text("$${String.format("%.2f", data?.positionMargin ?: 0.0)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("الهامش المتاح المتبقي", color = TextGray, fontSize = 12.sp)
+                                Text("الهامش المتاح (Available Margin)", color = TextGray, fontSize = 12.sp)
                                 Text("$${String.format("%.2f", data?.availableBalance ?: 0.0)} USDT", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             }
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Unrealized PNL
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("أرباح/خسائر غير محققة (Unrealized PnL)", color = TextGray, fontSize = 12.sp)
+                                val pnlColor = if (totalUnrealizedPnl >= 0) TextGreen else TextRed
+                                val pnlSign = if (totalUnrealizedPnl >= 0) "+" else ""
+                                Text("$pnlSign$${String.format("%.2f", totalUnrealizedPnl)} USDT", color = pnlColor, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Margin Ratio
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("نسبة الهامش (Margin Ratio)", color = TextGray, fontSize = 12.sp)
+                                Text("${String.format("%.2f", marginRatio)}%", color = Color.White, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            }
                         }
                     }
                 }
@@ -835,7 +903,7 @@ fun WalletTabContent(viewModel: MariaBotViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("نسبة الهامش ومخاطر الحساب", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("درجة المخاطرة ونظام الهامش (Risk Level)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(10.dp))
                             
                             LinearProgressIndicator(
@@ -852,10 +920,37 @@ fun WalletTabContent(viewModel: MariaBotViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("معدل الاستخدام: ${String.format("%.1f", marginRatio)}%", color = TextGray, fontSize = 11.sp)
                                 val riskStr = if (marginRatio > 50.0) "مرتفعة (High)" else if (marginRatio > 20.0) "متوسطة (Medium)" else "آمنة (Low Risk)"
                                 val riskColor = if (marginRatio > 50.0) TextRed else if (marginRatio > 20.0) AmberAccent else TextGreen
-                                Text("درجة المخاطرة: $riskStr", color = riskColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("معدل الاستخدام: ${String.format("%.1f", marginRatio)}%", color = TextGray, fontSize = 11.sp)
+                                Text("مستوى المخاطرة: $riskStr", color = riskColor, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardBg.copy(alpha = 0.8f)),
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("المراكز المفتوحة (Open Positions): ${activePositions.size}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            if (activePositions.isEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("لا توجد مراكز نشطة مفتوحة حالياً.", color = TextGray, fontSize = 11.sp)
+                            } else {
+                                activePositions.forEach { pos ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("${pos.type} ${pos.pair} ${pos.leverage}x", color = if (pos.type == "LONG") TextGreen else TextRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("$${String.format("%.2f", pos.pnl)} USDT (${String.format("%.2f", pos.pnlPercent)}%)", color = if (pos.pnl >= 0) TextGreen else TextRed, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                }
                             }
                         }
                     }
