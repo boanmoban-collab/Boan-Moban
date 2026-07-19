@@ -2,7 +2,7 @@
 # Local CI Build Helper Script
 
 echo "=== Preparing Build Environment for Maria Bot (LT_9904) ==="
-gradle wrapper --gradle-version 8.4 --distribution-type all
+gradle wrapper --gradle-version 8.7 --distribution-type all
 chmod +x ./gradlew
 
 echo "=== Running Unit Tests ==="

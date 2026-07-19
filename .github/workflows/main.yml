@@ -30,7 +30,7 @@ jobs:
         cache: 'gradle'
 
     - name: Generate Gradle Wrapper
-      run: gradle wrapper --gradle-version 8.4 --distribution-type all
+      run: gradle wrapper --gradle-version 8.7 --distribution-type all
 
     - name: Grant Execute Permission for Gradlew
       run: chmod +x ./gradlew

@@ -4,7 +4,7 @@ This guide documents the configuration required to build, sign, and install the 
 
 ## Build Requirements
 - **JDK:** Version 17
-- **Gradle:** Version 8.4+
+- **Gradle:** Version 8.7+
 - **Android Gradle Plugin (AGP):** Version 8.4.0 (optimized for Gradle 9+ environment compatibility)
 
 ## Signing Instructions for LT_9904
