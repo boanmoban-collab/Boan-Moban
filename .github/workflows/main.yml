@@ -29,20 +29,6 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
-    - name: Set up Node.js 20 LTS
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: 'npm'
-
-    - name: Build Web Application Frontend
-      run: |
-        npm ci
-        npm run lint
-        npm run build
-        mkdir -p app/src/main/assets
-        cp -r dist/* app/src/main/assets/
-
     - name: Generate Gradle Wrapper
       run: gradle wrapper --gradle-version 8.4 --distribution-type all
 
