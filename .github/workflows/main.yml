@@ -1,0 +1,121 @@
+name: Maria Bot Build & Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "*" ]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Sign Android App
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Set up Java JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Set up Node.js 20 LTS
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+
+    - name: Build Web Application Frontend
+      run: |
+        npm ci
+        npm run lint
+        npm run build
+        mkdir -p app/src/main/assets
+        cp -r dist/* app/src/main/assets/
+
+    - name: Generate Gradle Wrapper
+      run: gradle wrapper --gradle-version 8.4 --distribution-type all
+
+    - name: Grant Execute Permission for Gradlew
+      run: chmod +x ./gradlew
+
+    - name: Prepare Keystore and key.properties (use secret or generate temp)
+      run: |
+        mkdir -p app
+        if [ -n "${{ secrets.CM_KEYSTORE }}" ]; then
+          echo "Using provided keystore secret"
+          echo "${{ secrets.CM_KEYSTORE }}" | base64 --decode > app/release.keystore
+        fi
+
+        if [ -n "${{ secrets.CM_KEYSTORE_PASSWORD }}" ] && [ -n "${{ secrets.CM_KEY_ALIAS }}" ]; then
+          echo "storeFile=release.keystore" > key.properties
+          echo "storePassword=${{ secrets.CM_KEYSTORE_PASSWORD }}" >> key.properties
+          echo "keyAlias=${{ secrets.CM_KEY_ALIAS }}" >> key.properties
+          echo "keyPassword=${{ secrets.CM_KEYSTORE_PASSWORD }}" >> key.properties
+        else
+          echo "Secrets missing — generating temporary keystore for CI"
+          keytool -genkeypair -v \
+            -keystore app/release.keystore \
+            -storepass androidci \
+            -keypass androidci \
+            -alias ci_release \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=CI,O=CI,L=CI,ST=CI,C=CI"
+          echo "storeFile=release.keystore" > key.properties
+          echo "storePassword=androidci" >> key.properties
+          echo "keyAlias=ci_release" >> key.properties
+          echo "keyPassword=androidci" >> key.properties
+        fi
+
+    - name: Run Gradle Lint
+      run: ./gradlew lint --no-daemon
+
+    - name: Run Unit Tests
+      run: ./gradlew test --no-daemon
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon --stacktrace --info
+
+    - name: Build Release AAB Bundle
+      run: ./gradlew bundleRelease --no-daemon --stacktrace --info
+
+    - name: Upload Release APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MariaBot-Release-APK
+        path: app/build/outputs/apk/release/*.apk
+
+    - name: Upload Release AAB Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MariaBot-Release-AAB
+        path: app/build/outputs/bundle/release/*.aab
+
+    - name: Create GitHub Release and Upload Artifacts
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        name: Maria Bot Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        body: |
+          تلقائي: تم بناء وتوقيع الإصدار بنجاح من خلال GitHub Actions.
+          
+          ### ملفات الإصدار المتاحة:
+          - 📦 **حزمة APK الموقّعة:** قم بتحميل ملف الـ APK المرفق لتثبيته مباشرة على جهازك.
+          - ⚙️ **ملف حزمة AAB:** للرفع والتثبيت على متجر Google Play Console.
+        files: |
+          app/build/outputs/apk/release/*.apk
+          app/build/outputs/bundle/release/*.aab
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

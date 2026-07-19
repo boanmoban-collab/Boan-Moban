@@ -1,11 +1,31 @@
-<div align="center">
+# Maria Bot - MEXC Futures & Build Hub (Android Native)
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+تطبيق أندرويد أصلي (Native) بالكامل مكتوب بلغة **Kotlin** وباستخدام واجهة **Jetpack Compose** المتقدمة مع تطبيق معايير Material Design 3 بالكامل.
 
-  <h1>Built with AI Studio</h2>
+## المميزات الرئيسية للمشروع
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+1. **لوحة التداول والتحليل (Trading & Analysis)**:
+   - رسم بياني ديناميكي فوري لأسعار البيتكوين `BTCUSDT` يتم تحديثه تلقائياً كل ثانية ونصف.
+   - فتح صفقات سريعة (Long/Short) بالرافعة المالية المختارة مع حساب الأرباح والخسائر PnL والنسبة المئوية فوراً.
+   - إغلاق الصفقات تلقائياً بعد مرور وقت الحدث المحدد (10 دقائق افتراضياً) وإعادة رصيد التكلفة مضافاً إليه الأرباح لمحفظتك.
+   
+2. **توريد المكافآت التلقائي (Auto Reward Harvesting)**:
+   - نظام ذكي لمراقبة وتوريد مكافآت Spot المتراكمة ونقلها تلقائياً لمحفظة Futures لدعم ميزانية الصفقات الجديدة.
+   - إمكانية التوريد اليدوي الفوري وحفظ السجلات بشكل آمن.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+3. **مولد GitHub Actions لـ أندرويد (Android Workflow Builder)**:
+   - مولد ملفات `.github/workflows/main.yml` بشكل تفاعلي بالكامل لتسهيل بناء حزم وتطبيقات أندرويد 15 وتوقيعها رقمياً بدقة فائقة.
+   - دليل مفصل للمطورين لأوامر التوقيع واستخراج Base64 لجهاز LT_9904.
 
-</div>
+4. **إعدادات السير والأمان (Settings & Security)**:
+   - ربط آمن لمفاتيح API الخاصة بـ MEXC.
+   - تعديل مستوى الرافعة المالية (10x, 20x, 50x, 100x).
+   - إمكانية تفعيل وضع الاتصال المباشر (Live) أو وضع المحاكاة التجريبية الآمن (Sandbox).
+
+---
+
+## متطلبات التشغيل والتطوير (Local Development)
+
+- **Android Studio** (Koala أو أحدث).
+- **JDK 17** أو أحدث.
+- **Gradle 8.2** أو أحدث.
