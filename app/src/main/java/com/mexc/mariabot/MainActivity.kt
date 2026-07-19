@@ -27,7 +27,16 @@ class MainActivity : ComponentActivity() {
         // 1. Initialize Local SQLite Database Helper
         val dbHelper = AppDatabaseHelper(applicationContext)
 
-        // 2. Initialize official MEXC Retrofit API Service
+        // 2. Initialize Notification Channels & Request Permission on API 33+
+        com.mexc.mariabot.util.NotificationCenter.initChannels(applicationContext)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            val permission = android.Manifest.permission.POST_NOTIFICATIONS
+            if (androidx.core.content.ContextCompat.checkSelfPermission(this, permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(permission), 101)
+            }
+        }
+
+        // 3. Initialize official MEXC Retrofit API Service
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.mexc.com/") // Official MEXC Spot/Futures Base Endpoint
             .addConverterFactory(GsonConverterFactory.create())

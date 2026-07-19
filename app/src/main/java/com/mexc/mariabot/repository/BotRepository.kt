@@ -46,6 +46,11 @@ class BotRepository(
 
         if (config.isSandbox || config.apiKey.isBlank() || config.apiSecret.isBlank()) {
             addBotLog("SUCCESS", "🎯 [Sandbox] تم فتح صفقة $type بنجاح على الزوج $pair بسعر $price USDT ورافعة x$leverage")
+            com.mexc.mariabot.util.NotificationCenter.sendTradeNotification(
+                dbHelper.context,
+                "تم فتح صفقة تجريبية ($type)",
+                "تم فتح صفقة $type على الزوج $pair بسعر $price USDT (وضع Sandbox)."
+            )
         } else {
             // Real execution signature logic
             val params = mapOf(
@@ -60,6 +65,11 @@ class BotRepository(
             // Perform asynchronous API post here or run in a background thread.
             // For UI responsiveness, we handle network results gracefully.
             addBotLog("INFO", "🚀 [Real API] تم إرسال طلب فتح صفقة $type إلى MEXC...")
+            com.mexc.mariabot.util.NotificationCenter.sendTradeNotification(
+                dbHelper.context,
+                "طلب فتح صفقة حقيقية ($type)",
+                "جاري إرسال طلب فتح صفقة $type على الزوج $pair بسعر $price إلى منصة MEXC."
+            )
         }
 
         return position
@@ -82,7 +92,14 @@ class BotRepository(
         )
 
         dbHelper.insertPosition(updatedPos)
-        addBotLog("SUCCESS", "🛑 تم إغلاق صفقة ${pos.type} للزوج ${pos.pair} بسعر $exitPrice USDT. الأرباح/الخسائر: ${String.format("%.2f", pnl)} USDT (${String.format("%.2f", pnlPercent)}%)")
+        val logMessage = "🛑 تم إغلاق صفقة ${pos.type} للزوج ${pos.pair} بسعر $exitPrice USDT. الأرباح/الخسائر: ${String.format("%.2f", pnl)} USDT (${String.format("%.2f", pnlPercent)}%)"
+        addBotLog("SUCCESS", logMessage)
+        
+        com.mexc.mariabot.util.NotificationCenter.sendTradeNotification(
+            dbHelper.context,
+            "إغلاق صفقة ${pos.type}",
+            "تم إغلاق الصفقة بسعر $exitPrice USDT. الأرباح/الخسائر: ${String.format("%.2f", pnl)} USDT (${String.format("%.2f", pnlPercent)}%)"
+        )
     }
 
     fun insertPosition(position: TradePosition) {
@@ -131,5 +148,11 @@ class BotRepository(
 
         dbHelper.insertTransferLog(transferLog)
         addBotLog("SUCCESS", "💸 تم تحويل مكافأة بقيمة $amount USDT بنجاح من محفظة Spot (المكافآت التلقائية) إلى محفظة Futures لدعم هامش الصفقات.")
+        
+        com.mexc.mariabot.util.NotificationCenter.sendSystemNotification(
+            dbHelper.context,
+            "تحويل المكافآت التلقائي",
+            "تم تحويل $amount USDT بنجاح من محفظة Spot إلى Futures لدعم الهامش."
+        )
     }
 }

@@ -9,7 +9,7 @@ import com.mexc.mariabot.model.MEXCConfig
 import com.mexc.mariabot.model.RewardTransferLog
 import com.mexc.mariabot.model.TradePosition
 
-class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class AppDatabaseHelper(val context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         private const val DATABASE_NAME = "mariabot.db"
