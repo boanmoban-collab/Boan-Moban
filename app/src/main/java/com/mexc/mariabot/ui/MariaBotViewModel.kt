@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mexc.mariabot.model.*
 import com.mexc.mariabot.repository.BotRepository
+import com.mexc.mariabot.network.MexcWebSocketClient
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +13,10 @@ import java.util.UUID
 import kotlin.random.Random
 
 class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
+
+    val marketIntelligence = com.mexc.mariabot.network.MarketIntelligenceEngine(repository)
+    val tradingEngine = com.mexc.mariabot.network.TradingEngine(repository, repository.apiService)
+    val rewardManager = com.mexc.mariabot.network.RewardManager(repository, repository.apiService)
 
     private val _configState = MutableStateFlow(MEXCConfig())
     val configState: StateFlow<MEXCConfig> = _configState.asStateFlow()
@@ -31,6 +36,15 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
     private val _priceHistoryState = MutableStateFlow<List<Double>>(List(15) { 68500.0 })
     val priceHistoryState: StateFlow<List<Double>> = _priceHistoryState.asStateFlow()
 
+    private val _marketInsightState = MutableStateFlow<com.mexc.mariabot.network.MarketInsight?>(null)
+    val marketInsightState: StateFlow<com.mexc.mariabot.network.MarketInsight?> = _marketInsightState.asStateFlow()
+
+    private val _newsState = MutableStateFlow<List<com.mexc.mariabot.network.NewsArticle>>(emptyList())
+    val newsState: StateFlow<List<com.mexc.mariabot.network.NewsArticle>> = _newsState.asStateFlow()
+
+    private val _timeOffsetState = MutableStateFlow(0L)
+    val timeOffsetState: StateFlow<Long> = _timeOffsetState.asStateFlow()
+
     private val _isAutoTradingActive = MutableStateFlow(false)
     val isAutoTradingActive: StateFlow<Boolean> = _isAutoTradingActive.asStateFlow()
 
@@ -40,11 +54,40 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
     private var priceJob: Job? = null
     private var tradingJob: Job? = null
     private var rewardsJob: Job? = null
+    private var wsClient: MexcWebSocketClient? = null
+    private var lastWebSocketUpdate: Long = 0
 
     init {
         loadInitialData()
+        syncTime()
+        startWebSocketConnection()
         startPriceSimulation()
         startAutomaticRewardsLoop()
+    }
+
+    fun syncTime() {
+        viewModelScope.launch {
+            com.mexc.mariabot.network.TimeSyncManager.syncWithServer(repository.apiService, repository)
+            _timeOffsetState.value = com.mexc.mariabot.network.TimeSyncManager.getTimeOffset()
+        }
+    }
+
+    private fun startWebSocketConnection() {
+        wsClient = MexcWebSocketClient(
+            onPriceUpdate = { livePrice ->
+                lastWebSocketUpdate = System.currentTimeMillis()
+                viewModelScope.launch(Dispatchers.Main) {
+                    onPriceChanged(livePrice)
+                }
+            },
+            onLog = { type, msg ->
+                viewModelScope.launch(Dispatchers.Main) {
+                    repository.addBotLog(type, msg)
+                    _botLogsState.value = repository.getBotLogs()
+                }
+            }
+        )
+        wsClient?.connect()
     }
 
     private fun loadInitialData() {
@@ -84,12 +127,14 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         _botLogsState.value = repository.getBotLogs()
     }
 
-    fun executeManualOrder(type: String, amount: Double) {
+    fun executeManualOrder(type: String, amount: Double, stopLoss: Double? = null, takeProfit: Double? = null) {
         val price = _btcPriceState.value
         val leverage = _configState.value.leverage
-        repository.executeOrder("BTCUSDT", type, amount, leverage, price)
-        _positionsState.value = repository.getPositions()
-        _botLogsState.value = repository.getBotLogs()
+        viewModelScope.launch {
+            tradingEngine.placeFuturesOrder("BTCUSDT", type, amount, leverage, price, stopLoss, takeProfit, isAuto = false)
+            _positionsState.value = repository.getPositions()
+            _botLogsState.value = repository.getBotLogs()
+        }
     }
 
     fun closeActivePosition(id: String) {
@@ -100,9 +145,11 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
     }
 
     fun manualRewardTransfer(amount: Double) {
-        repository.transferRewards(amount)
-        _transferLogsState.value = repository.getTransferLogs()
-        _botLogsState.value = repository.getBotLogs()
+        viewModelScope.launch {
+            rewardManager.executeOfficialAssetTransfer(amount)
+            _transferLogsState.value = repository.getTransferLogs()
+            _botLogsState.value = repository.getBotLogs()
+        }
     }
 
     fun clearLogs() {
@@ -115,45 +162,63 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         _positionsState.value = repository.getPositions()
     }
 
+    fun onPriceChanged(newPrice: Double) {
+        _btcPriceState.value = newPrice
+
+        // Update history
+        val history = _priceHistoryState.value.toMutableList()
+        history.add(newPrice)
+        if (history.size > 20) {
+            history.removeAt(0)
+        }
+        _priceHistoryState.value = history
+
+        // Analyze and update insights
+        val insight = marketIntelligence.analyzeMarket(history, "BTCUSDT")
+        _marketInsightState.value = insight
+        _newsState.value = marketIntelligence.getLatestNews()
+
+        // Monitor active positions for stop losses and take profits
+        tradingEngine.monitorPositions(newPrice)
+
+        // Update active positions PnL
+        val activePos = repository.getPositions()
+        var mutated = false
+        activePos.forEach { pos ->
+            if (pos.status == "ACTIVE") {
+                val pnlMultiplier = if (pos.type == "LONG") 1 else -1
+                val rawDiff = ((newPrice - pos.entryPrice) / pos.entryPrice) * pnlMultiplier
+                val pnlPercent = rawDiff * pos.leverage * 100.0
+                val pnl = pos.amount * (rawDiff * pos.leverage)
+
+                val updated = pos.copy(
+                    currentPrice = newPrice,
+                    pnl = pnl,
+                    pnlPercent = pnlPercent
+                )
+                repository.insertPosition(updated)
+                mutated = true
+            }
+        }
+        if (mutated) {
+            _positionsState.value = repository.getPositions()
+        }
+    }
+
     private fun startPriceSimulation() {
         priceJob?.cancel()
         priceJob = viewModelScope.launch(Dispatchers.Default) {
             while (isActive) {
                 delay(1500)
-                val currentPrice = _btcPriceState.value
-                val pctChange = (Random.nextDouble() - 0.49) * 0.002 // slight upward bias
-                val newPrice = currentPrice * (1 + pctChange)
-                _btcPriceState.value = newPrice
-
-                // Update history
-                val history = _priceHistoryState.value.toMutableList()
-                history.add(newPrice)
-                if (history.size > 20) {
-                    history.removeAt(0)
-                }
-                _priceHistoryState.value = history
-
-                // Update active positions PnL
-                val activePos = repository.getPositions()
-                var mutated = false
-                activePos.forEach { pos ->
-                    if (pos.status == "ACTIVE") {
-                        val pnlMultiplier = if (pos.type == "LONG") 1 else -1
-                        val rawDiff = (newPrice - pos.entryPrice) / pos.entryPrice
-                        val pnlPercent = rawDiff * pos.leverage * 100.0
-                        val pnl = pos.amount * (rawDiff * pos.leverage)
-
-                        val updated = pos.copy(
-                            currentPrice = newPrice,
-                            pnl = pnl,
-                            pnlPercent = pnlPercent
-                        )
-                        repository.insertPosition(updated)
-                        mutated = true
+                // Fallback to simulation only if WebSocket hasn't received update in last 3 seconds
+                if (System.currentTimeMillis() - lastWebSocketUpdate > 3000) {
+                    val currentPrice = _btcPriceState.value
+                    val pctChange = (Random.nextDouble() - 0.49) * 0.002 // slight upward bias
+                    val newPrice = currentPrice * (1 + pctChange)
+                    
+                    withContext(Dispatchers.Main) {
+                        onPriceChanged(newPrice)
                     }
-                }
-                if (mutated) {
-                    _positionsState.value = repository.getPositions()
                 }
             }
         }
@@ -168,35 +233,20 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
                 val history = _priceHistoryState.value
 
                 if (history.size >= 5) {
-                    val emaShort = history.takeLast(3).average()
-                    val emaLong = history.takeLast(5).average()
-
+                    val insight = marketIntelligence.analyzeMarket(history, "BTCUSDT")
                     val activePositions = repository.getPositions().filter { it.status == "ACTIVE" }
 
-                    if (emaShort > emaLong && activePositions.none { it.type == "LONG" }) {
-                        // Bullish signal -> Open Long
+                    if (insight.suggestedSignal == "BUY_LONG" && activePositions.none { it.type == "LONG" }) {
                         withContext(Dispatchers.Main) {
-                            executeManualOrder("LONG", Random.nextDouble(0.01, 0.05))
+                            val sl = currentPrice * 0.985
+                            val tp = currentPrice * 1.05
+                            executeManualOrder("LONG", Random.nextDouble(0.01, 0.05), sl, tp)
                         }
-                    } else if (emaShort < emaLong && activePositions.none { it.type == "SHORT" }) {
-                        // Bearish signal -> Open Short
+                    } else if (insight.suggestedSignal == "SELL_SHORT" && activePositions.none { it.type == "SHORT" }) {
                         withContext(Dispatchers.Main) {
-                            executeManualOrder("SHORT", Random.nextDouble(0.01, 0.05))
-                        }
-                    }
-
-                    // Auto-take-profit or stop-loss check
-                    activePositions.forEach { pos ->
-                        if (pos.pnlPercent >= 15.0) {
-                            repository.addBotLog("INFO", "🎯 [Auto-Take-Profit] تم الوصول للربح المستهدف +15%. إغلاق تلقائي.")
-                            withContext(Dispatchers.Main) {
-                                closeActivePosition(pos.id)
-                            }
-                        } else if (pos.pnlPercent <= -10.0) {
-                            repository.addBotLog("INFO", "🛡️ [Auto-Stop-Loss] تم كسر حد وقف الخسارة -10%. إغلاق احترازي.")
-                            withContext(Dispatchers.Main) {
-                                closeActivePosition(pos.id)
-                            }
+                            val sl = currentPrice * 1.015
+                            val tp = currentPrice * 0.95
+                            executeManualOrder("SHORT", Random.nextDouble(0.01, 0.05), sl, tp)
                         }
                     }
                 }
@@ -228,5 +278,6 @@ class MariaBotViewModel(private val repository: BotRepository) : ViewModel() {
         priceJob?.cancel()
         tradingJob?.cancel()
         rewardsJob?.cancel()
+        wsClient?.close()
     }
 }

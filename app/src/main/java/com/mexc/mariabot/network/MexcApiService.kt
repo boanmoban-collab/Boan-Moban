@@ -9,6 +9,9 @@ import retrofit2.http.QueryMap
 
 interface MexcApiService {
 
+    @GET("api/v3/time")
+    fun getServerTime(): Call<ServerTimeResponse>
+
     @GET("api/v3/account")
     fun getSpotAccount(
         @Header("X-MEXC-APIKEY") apiKey: String,
@@ -88,4 +91,8 @@ data class OrderResultData(
     @SerializedName("symbol") val symbol: String,
     @SerializedName("price") val price: Double,
     @SerializedName("vol") val vol: Double
+)
+
+data class ServerTimeResponse(
+    @SerializedName("serverTime") val serverTime: Long
 )

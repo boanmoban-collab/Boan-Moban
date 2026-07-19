@@ -20,7 +20,9 @@ data class TradePosition(
     val pnl: Double = 0.0,
     val pnlPercent: Double = 0.0,
     val timestamp: Long,
-    val status: String = "ACTIVE" // "ACTIVE" or "CLOSED"
+    val status: String = "ACTIVE", // "ACTIVE" or "CLOSED"
+    val stopLoss: Double? = null,
+    val takeProfit: Double? = null
 )
 
 data class RewardTransferLog(

@@ -4,14 +4,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.mexc.mariabot.database.AppDatabaseHelper
 import com.mexc.mariabot.network.MexcApiService
 import com.mexc.mariabot.repository.BotRepository
 import com.mexc.mariabot.ui.MariaBotViewModel
 import com.mexc.mariabot.ui.screens.DashboardScreen
 import com.mexc.mariabot.ui.theme.MariaBotTheme
+import com.mexc.mariabot.worker.BotStatusWorker
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +37,19 @@ class MainActivity : ComponentActivity() {
         // 3. Initialize Repository & ViewModel via standard Constructor Injection
         val repository = BotRepository(dbHelper, apiService)
         val viewModel = MariaBotViewModel(repository)
+
+        // 4. Schedule Background Periodic Telemetry Checks via WorkManager
+        try {
+            val statusWorkRequest = PeriodicWorkRequestBuilder<BotStatusWorker>(15, TimeUnit.MINUTES)
+                .build()
+            WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+                "MariaBotStatusTelemetry",
+                ExistingPeriodicWorkPolicy.KEEP,
+                statusWorkRequest
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         setContent {
             MariaBotTheme {

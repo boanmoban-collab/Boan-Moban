@@ -184,6 +184,8 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
     val logs by viewModel.botLogsState.collectAsState()
 
     var manualAmount by remember { mutableStateOf("0.02") }
+    var manualStopLoss by remember { mutableStateOf("") }
+    var manualTakeProfit by remember { mutableStateOf("") }
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -193,7 +195,7 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Toggle AI Trading Card
                 Card(
@@ -209,20 +211,23 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = if (isAutoTradingActive) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = if (isAutoTradingActive) EmeraldNeon else Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = if (isAutoTradingActive) "تداول تلقائي نشط" else "تفعيل التداول التلقائي",
+                            text = if (isAutoTradingActive) "تداول نشط" else "تداول متوقف",
                             color = if (isAutoTradingActive) EmeraldNeon else Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -235,20 +240,52 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                     border = BorderStroke(1.dp, BorderColor)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Memory,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "الأجهزة: LT_9904",
+                            text = "جهاز: LT_9904",
                             color = Color.LightGray,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Cloud Status / Socket Connection info
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    border = BorderStroke(1.dp, EmeraldNeon.copy(alpha = 0.4f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudQueue,
+                            contentDescription = null,
+                            tint = EmeraldNeon,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "السحابة: متصل",
+                            color = EmeraldNeon,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -272,6 +309,125 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     PriceChart(priceHistory)
+                }
+            }
+        }
+
+        // Market Intelligence & AI Analysis
+        item {
+            val insight by viewModel.marketInsightState.collectAsState()
+            val news by viewModel.newsState.collectAsState()
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "تحليلات الذكاء الاصطناعي الفورية (AI Market Intel)",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        insight?.let {
+                            val badgeColor = when (it.sentiment) {
+                                "BULLISH" -> TextGreen
+                                "BEARISH" -> TextRed
+                                else -> Color.Gray
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (it.sentiment == "BULLISH") "صعودي (BULLISH)" else if (it.sentiment == "BEARISH") "هبوطي (BEARISH)" else "حيادي (NEUTRAL)",
+                                    color = badgeColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    insight?.let {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1.0f)) {
+                                Text("مؤشر RSI", color = Color.Gray, fontSize = 11.sp)
+                                val rsiCat = if (it.rsi > 70) "شراء مفرط" else if (it.rsi < 30) "بيع مفرط" else "متوازن"
+                                Text("${String.format("%.1f", it.rsi)} ($rsiCat)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(modifier = Modifier.weight(1.0f)) {
+                                Text("التذبذب", color = Color.Gray, fontSize = 11.sp)
+                                Text(it.volatility, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(modifier = Modifier.weight(1.0f)) {
+                                Text("الإشارة المقترحة", color = Color.Gray, fontSize = 11.sp)
+                                Text(
+                                    text = if (it.suggestedSignal == "BUY_LONG") "شراء LONG" else if (it.suggestedSignal == "SELL_SHORT") "بيع SHORT" else "انتظار WAIT",
+                                    color = if (it.suggestedSignal == "BUY_LONG") TextGreen else if (it.suggestedSignal == "SELL_SHORT") TextRed else Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "💡 تحليل الخوارزميات: مؤشر القوة RSI عند ${String.format("%.1f", it.rsi)} مع معدل تذبذب ${it.volatility} وزخم عقود مفتوحة ${it.openInterestTrend}.",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+
+                    if (news.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = BorderColor, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("آخر معنويات السوق الأخبارية (BTC News)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        news.take(3).forEach { article ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(article.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(article.source, color = Color.Gray, fontSize = 9.sp)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (article.sentiment == "POSITIVE") TextGreen.copy(alpha = 0.15f)
+                                            else if (article.sentiment == "NEGATIVE") TextRed.copy(alpha = 0.15f)
+                                            else Color.Gray.copy(alpha = 0.15f),
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = article.sentiment,
+                                        color = if (article.sentiment == "POSITIVE") TextGreen else if (article.sentiment == "NEGATIVE") TextRed else Color.Gray,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -303,6 +459,36 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                             unfocusedBorderColor = BorderColor
                         )
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = manualStopLoss,
+                            onValueChange = { manualStopLoss = it },
+                            label = { Text("وقف الخسارة (SL)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                focusedLabelColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor
+                            )
+                        )
+                        OutlinedTextField(
+                            value = manualTakeProfit,
+                            onValueChange = { manualTakeProfit = it },
+                            label = { Text("جني الأرباح (TP)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = EmeraldNeon,
+                                focusedLabelColor = EmeraldNeon,
+                                unfocusedBorderColor = BorderColor
+                            )
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -311,7 +497,9 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                         Button(
                             onClick = {
                                 val amt = manualAmount.toDoubleOrNull() ?: 0.01
-                                viewModel.executeManualOrder("LONG", amt)
+                                val sl = manualStopLoss.toDoubleOrNull()
+                                val tp = manualTakeProfit.toDoubleOrNull()
+                                viewModel.executeManualOrder("LONG", amt, sl, tp)
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = TextGreen),
@@ -322,7 +510,9 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                         Button(
                             onClick = {
                                 val amt = manualAmount.toDoubleOrNull() ?: 0.01
-                                viewModel.executeManualOrder("SHORT", amt)
+                                val sl = manualStopLoss.toDoubleOrNull()
+                                val tp = manualTakeProfit.toDoubleOrNull()
+                                viewModel.executeManualOrder("SHORT", amt, sl, tp)
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = TextRed),
@@ -401,7 +591,7 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                             IconButton(
                                 onClick = { viewModel.closeActivePosition(pos.id) },
                                 modifier = Modifier.size(24.dp)
-                            ) {
+                              ) {
                                 Icon(Icons.Default.Close, contentDescription = "إغلاق الصفقة", tint = Color.Gray)
                             }
                         }
@@ -419,12 +609,34 @@ fun TradingTabContent(viewModel: MariaBotViewModel) {
                                 Text("$${String.format("%.2f", pos.currentPrice)}", color = Color.White, fontSize = 13.sp)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("الأرباح/الخسائر (PnL)", color = Color.Gray, fontSize = 11.sp)
+                                Text("PnL الأرباح/الخسائر", color = Color.Gray, fontSize = 11.sp)
                                 Text(
                                     text = "${if (pos.pnl >= 0) "+" else ""}${String.format("%.2f", pos.pnl)} USDT (${String.format("%.2f", pos.pnlPercent)}%)",
                                     color = if (pos.pnl >= 0) TextGreen else TextRed,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                        if (pos.stopLoss != null || pos.takeProfit != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "وقف الخسارة (SL): ${pos.stopLoss?.let { "$${String.format("%.2f", it)}" } ?: "غير محدد"}",
+                                    color = AmberAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "جني الأرباح (TP): ${pos.takeProfit?.let { "$${String.format("%.2f", it)}" } ?: "غير محدد"}",
+                                    color = EmeraldNeon,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }

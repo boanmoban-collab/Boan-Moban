@@ -8,7 +8,7 @@ import java.util.UUID
 
 class BotRepository(
     private val dbHelper: AppDatabaseHelper,
-    private val apiService: MexcApiService
+    val apiService: MexcApiService
 ) {
 
     fun getConfig(): MEXCConfig {

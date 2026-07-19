@@ -13,7 +13,7 @@ class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     companion object {
         private const val DATABASE_NAME = "mariabot.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
 
         // Table Names
         private const val TABLE_CONFIG = "mexc_config"
@@ -55,7 +55,9 @@ class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 pnl REAL,
                 pnlPercent REAL,
                 timestamp INTEGER,
-                status TEXT
+                status TEXT,
+                stopLoss REAL,
+                takeProfit REAL
             )
         """)
 
@@ -129,6 +131,8 @@ class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         val db = readableDatabase
         val cursor = db.query(TABLE_POSITIONS, null, null, null, null, null, "timestamp DESC")
         while (cursor.moveToNext()) {
+            val stopLossIdx = cursor.getColumnIndexOrThrow("stopLoss")
+            val takeProfitIdx = cursor.getColumnIndexOrThrow("takeProfit")
             list.add(
                 TradePosition(
                     id = cursor.getString(cursor.getColumnIndexOrThrow("id")),
@@ -141,7 +145,9 @@ class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                     pnl = cursor.getDouble(cursor.getColumnIndexOrThrow("pnl")),
                     pnlPercent = cursor.getDouble(cursor.getColumnIndexOrThrow("pnlPercent")),
                     timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
-                    status = cursor.getString(cursor.getColumnIndexOrThrow("status"))
+                    status = cursor.getString(cursor.getColumnIndexOrThrow("status")),
+                    stopLoss = if (cursor.isNull(stopLossIdx)) null else cursor.getDouble(stopLossIdx),
+                    takeProfit = if (cursor.isNull(takeProfitIdx)) null else cursor.getDouble(takeProfitIdx)
                 )
             )
         }
@@ -163,6 +169,8 @@ class AppDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             put("pnlPercent", position.pnlPercent)
             put("timestamp", position.timestamp)
             put("status", position.status)
+            put("stopLoss", position.stopLoss)
+            put("takeProfit", position.takeProfit)
         }
         db.insertWithOnConflict(TABLE_POSITIONS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
