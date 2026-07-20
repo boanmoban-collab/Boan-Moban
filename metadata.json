@@ -1,0 +1,6 @@
+{
+  "name": "MEXC Trading Terminal",
+  "description": "A production-grade trading and portfolio management terminal for MEXC, featuring time-synchronized API signing, Spot & Futures wallet views, real-time interactive charts, order book execution, and AI-powered Market Intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
